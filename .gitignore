@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+venv/
+.venv/
+backend/venv/
+
+# DB (estado de la VPS, no versionar)
+*.db
+*.sqlite3
+*.db-wal
+*.db-shm
+
+# ML models (re-entrenados en la VPS, no versionar)
+backend/app/ml/*.pkl
+
+# Env (secretos)
+.env
+.env.local
+
+# Node / frontend build
+node_modules/
+frontend-react/dist/
+
+# Logs
+logs/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
