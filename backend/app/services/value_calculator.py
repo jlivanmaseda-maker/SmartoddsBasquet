@@ -90,11 +90,9 @@ def _evaluate_side(odds_by_bk: dict, field: str, opp_field: str, model_prob: flo
     if sharp_probs:
         avg_sharp_prob = sum(sharp_probs) / len(sharp_probs)
         fair_odds = 1.0 / avg_sharp_prob
-    else:
-        # Fallback: cuota cruda de 1xBet o Pinnacle
-        raw = odds_by_bk.get("onexbet", {}).get(field) or odds_by_bk.get("pinnacle", {}).get(field)
-        if raw and raw > 1.0:
-            fair_odds = raw
+    # Sin devig sharp válido -> fair_odds queda None y el lado se evalúa con el
+    # modelo (has_sharp=False -> SHADOW). NO usamos cuota cruda como "justa":
+    # lleva el margen de la casa dentro e infla artificialmente el edge.
 
     # Filtro mixed-line: sharp >3x mediana soft -> línea corrupta
     if fair_odds and fair_odds > 1.0:
