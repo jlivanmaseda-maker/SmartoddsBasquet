@@ -43,7 +43,7 @@ export default function EvolutionChart({ picks, height = 300 }: EvolutionChartPr
         label: `${p.match.homeTeam} vs ${p.match.awayTeam}`,
         result: p.result === "won" ? "W" : "L",
         bet: formatBetType(p.betType, p.match),
-        odds: p.bestOdds.toFixed(2),
+        odds: (p.bestOdds ?? 0).toFixed(2),
       };
     });
   }, [picks]);

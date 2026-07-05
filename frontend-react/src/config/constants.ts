@@ -27,7 +27,7 @@ export interface PickData {
   estimatedProbability: number;
   isActive?: boolean;
   isShadow?: boolean;
-  shadowReasons?: string[] | null;
+  shadowReasons?: string[] | string | null;
   result?: string | null;
   profitUnits?: number | null;
   clvPct?: number | null;

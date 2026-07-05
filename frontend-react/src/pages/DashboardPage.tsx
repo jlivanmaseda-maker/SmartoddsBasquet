@@ -180,14 +180,14 @@ export default function DashboardPage() {
                     {formatBetType(p.betType, p.match)}
                   </td>
                   <td className="px-3 py-2.5 text-xs text-center font-mono" style={{ color: "var(--v2-text-primary)" }}>
-                    {p.bestOdds.toFixed(2)}
+                    {(p.bestOdds ?? 0).toFixed(2)}
                   </td>
                   <td
                     className="px-3 py-2.5 text-xs text-center font-mono font-semibold"
-                    style={{ color: p.edge >= 0 ? "var(--v2-green)" : "var(--v2-red)" }}
+                    style={{ color: (p.edge ?? 0) >= 0 ? "var(--v2-green)" : "var(--v2-red)" }}
                   >
-                    {p.edge >= 0 ? "+" : ""}
-                    {p.edge.toFixed(1)}%
+                    {(p.edge ?? 0) >= 0 ? "+" : ""}
+                    {(p.edge ?? 0).toFixed(1)}%
                   </td>
                   <td className="px-3 py-2.5 text-center">
                     <span

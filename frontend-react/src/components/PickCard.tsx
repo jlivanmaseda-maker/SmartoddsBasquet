@@ -13,12 +13,22 @@ interface PickCardProps {
 }
 
 export default function PickCard({ pick }: PickCardProps) {
-  const { match, betType, edge, bestOdds, bestBookmaker, estimatedProbability } = pick;
+  const { match, betType, bestBookmaker } = pick;
+  // Nullable in the GraphQL schema — coalesce so .toFixed() never crashes.
+  const edge = pick.edge ?? 0;
+  const bestOdds = pick.bestOdds ?? 0;
+  const estimatedProbability = pick.estimatedProbability ?? 0;
   const isValue = edge > 0;
   const isHighEdge = edge >= 5;
   const isShadow = !!pick.isShadow;
   const accent = leagueColor(match.league);
   const betLabel = formatBetType(betType, match);
+  // Backend returns shadow_reasons as a comma-separated string, not an array.
+  const reasons: string[] = Array.isArray(pick.shadowReasons)
+    ? pick.shadowReasons
+    : typeof pick.shadowReasons === "string"
+      ? pick.shadowReasons.split(",").map((r) => r.trim()).filter(Boolean)
+      : [];
 
   return (
     <div
@@ -103,9 +113,9 @@ export default function PickCard({ pick }: PickCardProps) {
         </div>
 
         {/* Shadow reasons */}
-        {isShadow && pick.shadowReasons && pick.shadowReasons.length > 0 && (
+        {isShadow && reasons.length > 0 && (
           <div className="mt-[8px] pt-[8px] border-t border-[var(--v2-border-subtle)] flex flex-wrap gap-1">
-            {pick.shadowReasons.map((r, i) => (
+            {reasons.map((r, i) => (
               <span
                 key={i}
                 className="text-[9px] font-medium px-1.5 py-px rounded bg-[var(--v2-border-subtle)] text-[var(--v2-text-muted)]"

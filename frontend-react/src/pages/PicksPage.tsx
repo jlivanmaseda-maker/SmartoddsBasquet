@@ -64,7 +64,7 @@ export default function PicksPage() {
   }, [picks]);
 
   const avgEdge = picks.length
-    ? picks.reduce((s, p) => s + p.edge, 0) / picks.length
+    ? picks.reduce((s, p) => s + (p.edge ?? 0), 0) / picks.length
     : 0;
 
   const SHADOW_TABS: { key: ShadowFilter; label: string }[] = [

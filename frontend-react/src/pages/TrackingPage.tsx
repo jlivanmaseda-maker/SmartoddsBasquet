@@ -206,7 +206,7 @@ export default function TrackingPage() {
                         {formatBetType(p.betType, p.match)}
                       </td>
                       <td className="px-3 py-2.5 text-xs font-mono" style={{ color: "var(--v2-text-primary)" }}>
-                        {p.bestOdds.toFixed(2)}
+                        {(p.bestOdds ?? 0).toFixed(2)}
                       </td>
                       <td className="px-3 py-2.5 text-xs" style={{ color: "var(--v2-text-secondary)" }}>
                         {formatBookmaker(p.bestBookmaker)}
