@@ -109,13 +109,15 @@ class Settings:
     # Empezamos amplio (todas) y filtramos por rentabilidad mas adelante.
     MONITORED_LEAGUES: list = os.getenv(
         "MONITORED_LEAGUES",
-        "basketball_nba,basketball_euroleague,basketball_ncaab,basketball_wnba"
+        "basketball_nba,basketball_euroleague,basketball_ncaab,basketball_wnba,"
+        "basketball_nba_summer_league"
     ).split(",")
 
     # Todas las ligas de basket disponibles en The Odds API
     ALL_LEAGUES: list = [
         "basketball_nba",
         "basketball_nba_preseason",
+        "basketball_nba_summer_league",  # Las Vegas Summer League (verano)
         "basketball_wnba",
         "basketball_ncaab",            # NCAA College Basketball (mucho volumen)
         "basketball_ncaab_championship_winner",
@@ -132,7 +134,7 @@ class Settings:
     # apostar). FASE DE CALIBRACION: TODAS las ligas en shadow hasta que
     # scripts/backtest_shadow.py confirme rentabilidad con datos acumulados.
     # Para promover una liga a ACTIVE: quitarla de este set tras validarla.
-    SHADOW_TIERS: set = {"nba", "wnba", "ncaab", "euroleague", "nbl"}
+    SHADOW_TIERS: set = {"nba", "nba_sl", "wnba", "ncaab", "euroleague", "nbl"}
 
     # ================================================================
     # MERCADOS DE BASKET

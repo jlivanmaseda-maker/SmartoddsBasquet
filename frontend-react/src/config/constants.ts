@@ -64,6 +64,7 @@ export interface StandingRow {
 // Both bare keys (nba) and prefixed keys (basketball_nba) supported.
 export const LEAGUE_LABELS: Record<string, string> = {
   nba: "NBA",
+  "nba summer league": "Summer League",
   wnba: "WNBA",
   ncaab: "NCAAB",
   euroleague: "EuroLeague",
@@ -77,6 +78,7 @@ export const LEAGUE_LABELS: Record<string, string> = {
 
 export const LEAGUE_COLORS: Record<string, string> = {
   nba: "#C8102E", // rojo NBA
+  "nba summer league": "#F58426", // naranja verano
   wnba: "#FF6900",
   ncaab: "#0067B1",
   euroleague: "#EF7F1A",

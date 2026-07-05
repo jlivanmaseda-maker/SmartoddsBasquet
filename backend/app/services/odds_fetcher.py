@@ -43,6 +43,7 @@ logger = logging.getLogger("smartodds_basketball.odds_fetcher")
 SPORT_KEY_NAMES = {
     "basketball_nba": "NBA",
     "basketball_nba_preseason": "NBA Preseason",
+    "basketball_nba_summer_league": "NBA Summer League",
     "basketball_wnba": "WNBA",
     "basketball_ncaab": "NCAA Basketball",
     "basketball_ncaab_championship_winner": "NCAA Championship",
@@ -54,6 +55,9 @@ SPORT_KEY_NAMES = {
 SPORT_KEY_TIER = {
     "basketball_nba": "nba",
     "basketball_nba_preseason": "nba",
+    # Tier propio: Summer League usa nombres de franquicia NBA pero rosters de
+    # rookies/G-League; con tier separado su ELO no contamina el de la NBA real.
+    "basketball_nba_summer_league": "nba_sl",
     "basketball_wnba": "wnba",
     "basketball_ncaab": "ncaab",
     "basketball_ncaab_championship_winner": "ncaab",
