@@ -165,12 +165,14 @@ class Settings:
     H2H_WEIGHT: float = float(os.getenv("H2H_WEIGHT", "0.05"))
 
     # ================================================================
-    # EDGE Y FILTROS (placeholder — calibrar con backtest)
+    # EDGE Y FILTROS
+    # SA_MAX_EDGE=12: backtest shadow 28-Jul-2026 (147 picks) — edge 12%+
+    # pierde (-7% ROI, n=32); buckets 3-12% todos rentables.
     # ================================================================
     SYSTEM_MIN_EDGE: float = float(os.getenv("SYSTEM_MIN_EDGE", "3.0"))
     SYSTEM_MAX_ODDS: float = float(os.getenv("SYSTEM_MAX_ODDS", "5.0"))
     SYSTEM_MIN_ODDS: float = float(os.getenv("SYSTEM_MIN_ODDS", "1.20"))
-    SA_MAX_EDGE: float = float(os.getenv("SA_MAX_EDGE", "22.0"))
+    SA_MAX_EDGE: float = float(os.getenv("SA_MAX_EDGE", "12.0"))
     DISPLAY_MAX_EDGE: float = float(os.getenv("DISPLAY_MAX_EDGE", "15.0"))
 
     # ================================================================
