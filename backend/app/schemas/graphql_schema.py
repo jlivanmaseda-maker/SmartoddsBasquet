@@ -150,7 +150,9 @@ class Query:
             db.close()
 
     @strawberry.field
-    def stats(self, include_shadow: bool = False) -> StatsType:
+    def stats(self, include_shadow: bool = True) -> StatsType:
+        # Default True: en fase SHADOW todos los picks son shadow y el
+        # default False devolvía stats vacías. Pasar False para ver solo ACTIVE.
         db = SessionLocal()
         try:
             q = db.query(Pick)
