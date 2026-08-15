@@ -174,6 +174,10 @@ class Settings:
     SYSTEM_MIN_ODDS: float = float(os.getenv("SYSTEM_MIN_ODDS", "1.20"))
     SA_MAX_EDGE: float = float(os.getenv("SA_MAX_EDGE", "12.0"))
     DISPLAY_MAX_EDGE: float = float(os.getenv("DISPLAY_MAX_EDGE", "15.0"))
+    # Solo pickear partidos que empiecen en <= X horas: las lineas de apertura
+    # (la NBA se lista con meses de antelacion) son otro regimen — la sharp aun
+    # no ha afinado y el "edge" contra la soft suele ser linea desactualizada.
+    PICK_MAX_HOURS_AHEAD: float = float(os.getenv("PICK_MAX_HOURS_AHEAD", "72"))
 
     # ================================================================
     # SIMULATED ANNEALING (recalibracion semanal de pesos)

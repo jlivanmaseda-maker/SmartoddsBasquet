@@ -18,7 +18,7 @@ El edge se mide contra la sharp devig, NO contra el modelo. El modelo solo entra
 cuando no hay datos sharp.
 """
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 
@@ -145,6 +145,7 @@ def generate_picks(db=None) -> int:
     created = 0
     try:
         now = datetime.now(timezone.utc)
+        max_ahead = timedelta(hours=settings.PICK_MAX_HOURS_AHEAD)
         matches = db.query(Match).filter(
             Match.is_completed == False,  # noqa: E712
             Match.is_live == False,       # noqa: E712
@@ -157,6 +158,10 @@ def generate_picks(db=None) -> int:
             if ct.tzinfo is None:
                 ct = ct.replace(tzinfo=timezone.utc)
             if ct <= now:
+                continue
+            # Ventana de proximidad: fuera lineas de apertura (NBA se lista
+            # con meses de antelacion; ese "edge" no es el regimen calibrado).
+            if ct - now > max_ahead:
                 continue
 
             # Guard de conflicto: ya hay pick activo
