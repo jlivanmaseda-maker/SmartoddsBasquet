@@ -41,6 +41,9 @@ export const STATS_QUERY = `
       winratePct
       activePicks
       shadowPicks
+      clvN
+      avgClvPct
+      clvPositivePct
     }
   }
 `;
@@ -94,6 +97,9 @@ export const DASHBOARD_QUERY = `
       winratePct
       activePicks
       shadowPicks
+      clvN
+      avgClvPct
+      clvPositivePct
     }
     activePicks(includeShadow: $includeShadow, limit: $activeLimit) {
       ${PICK_FIELDS}

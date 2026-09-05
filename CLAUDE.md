@@ -91,6 +91,7 @@ SCORES (5 min): score_resolver.resolve_completed() [The Odds API /scores]
 | `services/odds_fetcher.py` | The Odds API. Filtra ligas activas con `/sports` (gratis). |
 | `services/value_calculator.py` | ⭐ Método sharp devig (primario) + modelo (fallback). |
 | `services/bookdif_calculator.py` | Señal BookDif (sharp vs soft). |
+| `services/clv_calculator.py` | ⭐ CLV vs cierre Pinnacle SIN margen (último snapshot de `odds_history` pre-tipoff). Se calcula al liquidar. |
 | `services/score_resolver.py` | Resultados vía The Odds API `/scores`. BetsAPI = fallback. |
 | `services/scheduler.py` | Orquesta los ciclos. |
 | `services/notification_service.py` | Telegram (bot propio de básquet). |
@@ -99,7 +100,10 @@ SCORES (5 min): score_resolver.resolve_completed() [The Odds API /scores]
 | `ml/elo_calculator.py` | Update de ELO de equipo (K por liga, ventaja de cancha). |
 | `ml/elo_seed.py` | Crawler ESPN (sin API key) + backtest walk-forward + grid search. |
 | `schemas/graphql_schema.py` | Queries: activePicks, resolvedPicks, stats, standings, systemConfig. |
-| `scripts/backtest_shadow.py` | Calibrador de SYSTEM_MIN_EDGE (ROI por bucket/liga). |
+| `scripts/backtest_shadow.py` | Calibrador: ROI + CLV por edge / cuota / liga / liga-mes. |
+| `scripts/backfill_clv.py` | Rellena CLV de picks ya resueltos (dry-run por defecto, `--apply`). |
+| `scripts/analyze_sharp_vs_pinnacle.py` | Diagnóstico (solo lectura): edge vs Pinnacle solo, movimiento de línea pick→cierre, sesgo de cada sharp. |
+| `scripts/void_opening_line_picks.py` | Anula picks pendientes a >PICK_MAX_HOURS_AHEAD (dry-run, `--apply`). |
 
 ### Frontend (`frontend-react/`)
 React 19 + TypeScript + Vite + **TailwindCSS v4 + Recharts + react-router**. Look
@@ -116,8 +120,27 @@ Picks, Tracking, Standings. El backend sirve el `dist` en `:8002`.
   (no 100 — la ventaja de local en basket moderno es ~55-57%) y K-factors por liga.
   WNBA 2026 ya seedeada a producción.
 - **Pendiente (go-live)**: la calibración de `SYSTEM_MIN_EDGE` y qué ligas salen de
-  shadow necesita histórico de picks resueltos. Mismo patrón ITF de tenis: dejar
-  correr en shadow ~2-3 semanas → `scripts/backtest_shadow.py` → decidir.
+  shadow necesita histórico de picks resueltos CON CLV bajo el régimen de 24h /
+  Pinnacle (desde 5-Sep-2026). `scripts/backtest_shadow.py` → decidir. La WNBA
+  (137 picks, ROI +8% pero CLV −0,9%) NO se promueve hasta ver CLV > 0; si se
+  promueve, con edge ≥5% y cuota <3,0 (los cortes que aguantaron jul-ago).
+
+## ⭐ CLV y timing del pick (hallazgo 5-Sep-2026)
+
+El CLV (cuota cogida vs cierre Pinnacle sin margen) es el indicador que manda,
+no el ROI: con 217 picks el ROI era +6% pero el CLV medio −1,7% (45% positivos).
+Todo el beneficio venía de junio (varianza). Causa: **timing**, no edge.
+Pinnacle publica la WNBA ~23h antes del tipoff y los picks se creaban de media
+37h antes (73% sin Pinnacle). Por antelación: 48-72h CLV −7,6%; 24-48h −1,3%;
+12-24h **+4,1%** (68% positivos). Por eso:
+
+- `PICK_MAX_HOURS_AHEAD=24` (antes 72).
+- `PICK_ANCHOR_BOOKMAKER=pinnacle` + `PICK_WAIT_FOR_ANCHOR_HOURS=12`: no se crea
+  NINGÚN pick sin Pinnacle cotizando hasta 12h antes del tipoff (el guard de
+  conflicto haría que un pick temprano bloquease el maduro).
+- Para promover una liga hay que ver CLV medio > 0 con este régimen, no solo ROI.
+- `odds` (upsert) recibe cuotas EN VIVO tras el tipoff: el cierre se saca de
+  `odds_history` (que solo guarda snapshot cuando la línea cambia).
 
 ## Disciplina SHADOW (mientras se calibra)
 

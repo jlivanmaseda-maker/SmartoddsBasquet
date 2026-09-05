@@ -89,6 +89,11 @@ export default function DashboardPage() {
           label="ROI"
           value={`${(stats?.roiPct || 0).toFixed(1)}%`}
           color={(stats?.roiPct || 0) >= 0 ? "green" : "red"}
+          subtitle={
+            stats?.avgClvPct == null
+              ? undefined
+              : `CLV ${stats.avgClvPct > 0 ? "+" : ""}${stats.avgClvPct.toFixed(1)}% · ${(stats.clvPositivePct ?? 0).toFixed(0)}% >0`
+          }
         />
         <StatCard
           label="Winrate"

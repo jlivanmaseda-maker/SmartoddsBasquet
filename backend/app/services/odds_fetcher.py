@@ -320,6 +320,15 @@ def process_league_events(db, sport_key: str, events: list) -> dict:
                     "last_updated": datetime.now(timezone.utc),
                 }
 
+                # Snapshot de historial SOLO si la linea cambio (o es nueva):
+                # antes se escribia cada 15 min aunque nada cambiara (~78k
+                # filas/dia, 290 MB de DB en sep-2026). El ultimo snapshot
+                # pre-tipoff sigue siendo la linea de cierre (para el CLV).
+                line_changed = odds is None or any(
+                    v is not None and getattr(odds, k) != v
+                    for k, v in odds_fields.items() if k != "last_updated"
+                )
+
                 if odds:
                     for k, v in odds_fields.items():
                         if v is not None:
@@ -331,6 +340,10 @@ def process_league_events(db, sport_key: str, events: list) -> dict:
                         **{k: v for k, v in odds_fields.items() if v is not None},
                     )
                     db.add(odds)
+
+                stats["updated_odds"] += 1
+                if not line_changed:
+                    continue
 
                 # OddsHistory snapshot
                 history = OddsHistory(
@@ -346,7 +359,7 @@ def process_league_events(db, sport_key: str, events: list) -> dict:
                     odds_spread_away=spreads.get("odds_spread_away"),
                 )
                 db.add(history)
-                stats["updated_odds"] += 1
+                stats["history_rows"] = stats.get("history_rows", 0) + 1
 
         except Exception as e:
             logger.error(f"Error procesando evento {event.get('id', '?')}: {e}", exc_info=True)

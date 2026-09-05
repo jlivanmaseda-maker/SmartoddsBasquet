@@ -175,6 +175,15 @@ def generate_picks(db=None) -> int:
                 continue
             obk = _odds_by_bk(odds_rows)
 
+            # Esperar a la sharp ancla (Pinnacle). Ver config.PICK_ANCHOR_BOOKMAKER:
+            # sin ella el "edge" es linea inmadura (CLV negativo) y el guard de
+            # conflicto bloquearia el pick bueno de mas tarde.
+            anchor = obk.get(settings.PICK_ANCHOR_BOOKMAKER) or {}
+            anchor_ok = bool(anchor.get("odds_home") and anchor.get("odds_away"))
+            hours_ahead = (ct - now).total_seconds() / 3600.0
+            if not anchor_ok and hours_ahead > settings.PICK_WAIT_FOR_ANCHOR_HOURS:
+                continue
+
             # Modelo (fallback) — para lados sin sharp
             home = db.query(Team).filter(Team.id == match.home_team_id).first()
             away = db.query(Team).filter(Team.id == match.away_team_id).first()

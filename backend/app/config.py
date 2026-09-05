@@ -177,7 +177,16 @@ class Settings:
     # Solo pickear partidos que empiecen en <= X horas: las lineas de apertura
     # (la NBA se lista con meses de antelacion) son otro regimen — la sharp aun
     # no ha afinado y el "edge" contra la soft suele ser linea desactualizada.
-    PICK_MAX_HOURS_AHEAD: float = float(os.getenv("PICK_MAX_HOURS_AHEAD", "72"))
+    # 72 -> 24 (CLV 5-Sep-2026, WNBA): picks a 48-72h CLV -7.6% (18% >0),
+    # 24-48h -1.3%, 12-24h +4.1% (68% >0). Pinnacle publica ~23h antes.
+    PICK_MAX_HOURS_AHEAD: float = float(os.getenv("PICK_MAX_HOURS_AHEAD", "24"))
+    # Sharp "ancla": no crear NINGUN pick (ni sharp ni modelo) mientras no
+    # cotice, salvo que falten <= PICK_WAIT_FOR_ANCHOR_HOURS para el tipoff.
+    # Motivo: el 73% de los picks se creaban sin Pinnacle (composite de
+    # BetOnline/LowVig/1xBet o modelo) y el guard de conflicto impedia luego
+    # el pick maduro; sin Pinnacle CLV -1.3%/-2.5%, con Pinnacle ~0/+.
+    PICK_ANCHOR_BOOKMAKER: str = os.getenv("PICK_ANCHOR_BOOKMAKER", "pinnacle")
+    PICK_WAIT_FOR_ANCHOR_HOURS: float = float(os.getenv("PICK_WAIT_FOR_ANCHOR_HOURS", "12"))
 
     # ================================================================
     # SIMULATED ANNEALING (recalibracion semanal de pesos)

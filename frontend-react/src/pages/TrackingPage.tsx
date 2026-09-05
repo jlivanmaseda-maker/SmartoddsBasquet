@@ -100,6 +100,9 @@ export default function TrackingPage() {
           { label: "Win Rate", value: `${(stats?.winratePct || 0).toFixed(1)}%`, color: (stats?.winratePct || 0) >= 50 ? "green" : "red" },
           { label: "ROI", value: `${(stats?.roiPct || 0).toFixed(1)}%`, color: (stats?.roiPct || 0) >= 0 ? "green" : "red" },
           { label: "Profit", value: `${(stats?.profitUnits || 0).toFixed(2)}u`, color: (stats?.profitUnits || 0) >= 0 ? "green" : "red" },
+          { label: "CLV medio", value: stats?.avgClvPct == null ? "—" : `${stats.avgClvPct > 0 ? "+" : ""}${stats.avgClvPct.toFixed(2)}%`, color: (stats?.avgClvPct ?? 0) > 0 ? "green" : "red" },
+          { label: "Picks con CLV > 0", value: stats?.clvPositivePct == null ? "—" : `${stats.clvPositivePct.toFixed(0)}%`, color: (stats?.clvPositivePct ?? 0) >= 50 ? "green" : "red" },
+          { label: "Con CLV", value: stats?.clvN ?? 0 },
         ]}
       />
 
@@ -166,7 +169,7 @@ export default function TrackingPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: "var(--v2-bg-elevated)" }}>
-                  {["Fecha", "Partido", "Liga", "Marcador", "Apuesta", "Cuota", "Casa", "Resultado", "Profit"].map((h) => (
+                  {["Fecha", "Partido", "Liga", "Marcador", "Apuesta", "Cuota", "CLV", "Casa", "Resultado", "Profit"].map((h) => (
                     <th key={h} className="px-3 py-3 text-left text-xs font-medium" style={{ color: "var(--v2-text-muted)" }}>
                       {h}
                     </th>
@@ -207,6 +210,13 @@ export default function TrackingPage() {
                       </td>
                       <td className="px-3 py-2.5 text-xs font-mono" style={{ color: "var(--v2-text-primary)" }}>
                         {(p.bestOdds ?? 0).toFixed(2)}
+                      </td>
+                      <td
+                        className="px-3 py-2.5 text-xs font-mono"
+                        title="CLV vs cierre sharp sin margen"
+                        style={{ color: p.clvPct == null ? "var(--v2-text-muted)" : p.clvPct > 0 ? "var(--v2-green)" : "var(--v2-red)" }}
+                      >
+                        {p.clvPct == null ? "—" : `${p.clvPct > 0 ? "+" : ""}${p.clvPct.toFixed(1)}%`}
                       </td>
                       <td className="px-3 py-2.5 text-xs" style={{ color: "var(--v2-text-secondary)" }}>
                         {formatBookmaker(p.bestBookmaker)}

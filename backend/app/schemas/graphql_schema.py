@@ -78,6 +78,10 @@ class StatsType:
     winrate_pct: float
     active_picks: int
     shadow_picks: int
+    # CLV vs cierre sharp sin margen (ver services/clv_calculator.py)
+    clv_n: int
+    avg_clv_pct: Optional[float]
+    clv_positive_pct: Optional[float]
 
 
 # ──────────────────────────────────────────────────────────────
@@ -166,7 +170,15 @@ class Query:
             settled = won + lost
             profit = sum(p.profit_units or 0.0 for p in resolved)
             staked = sum(1 for p in resolved if p.result in ("won", "lost"))
+            clvs = [p.clv_pct for p in resolved
+                    if p.clv_pct is not None and p.result in ("won", "lost")]
             return StatsType(
+                clv_n=len(clvs),
+                avg_clv_pct=round(sum(clvs) / len(clvs), 2) if clvs else None,
+                clv_positive_pct=(
+                    round(sum(1 for c in clvs if c > 0) / len(clvs) * 100, 1)
+                    if clvs else None
+                ),
                 total_picks=len(picks),
                 resolved=len(resolved),
                 won=won, lost=lost, void=void,

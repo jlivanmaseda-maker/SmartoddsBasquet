@@ -116,6 +116,16 @@ def resolve_match_picks(db: Session, match: Match) -> int:
             pick.is_active = False
             resolved += 1
 
+    # CLV: cuota sharp al cierre (odds_history pre-tipoff) vs cuota cogida.
+    # Nunca debe romper la liquidacion.
+    try:
+        from app.services.clv_calculator import compute_match_clv
+        n_clv = compute_match_clv(db, match)
+        if n_clv:
+            logger.info(f"CLV calculado para {n_clv} picks de match #{match.id}")
+    except Exception as e:
+        logger.warning(f"CLV match #{match.id}: {e}")
+
     # Liquidar user_bets enlazadas a estos picks.
     try:
         ub = resolve_user_bets(db, match)

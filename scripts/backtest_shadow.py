@@ -25,6 +25,9 @@ from app.models.match import Match
 
 
 EDGE_BUCKETS = [(0, 3), (3, 5), (5, 8), (8, 12), (12, 100)]
+ODDS_BUCKETS = [(1.0, 1.6), (1.6, 2.0), (2.0, 3.0), (3.0, 99.0)]
+
+HEADER = f"{'n':>5} {'profit':>9} {'roi%':>8} {'winrate%':>9} {'clv%':>7} {'clv>0':>6}"
 
 
 def _roi(picks):
@@ -40,6 +43,22 @@ def _roi(picks):
     return (n, profit, roi, winrate)
 
 
+def _clv(picks):
+    """(clv medio %, % picks con clv>0) o ('-', '-') si no hay CLV."""
+    vals = [p.clv_pct for p in picks if p.clv_pct is not None]
+    if not vals:
+        return ("-", "-")
+    avg = sum(vals) / len(vals)
+    pos = sum(1 for v in vals if v > 0) / len(vals) * 100
+    return (f"{avg:+.1f}", f"{pos:.0f}%")
+
+
+def _row(label, picks):
+    n, profit, roi, wr = _roi(picks)
+    clv, pos = _clv(picks)
+    return f"{label:<12} {n:>5} {profit:>9.2f} {roi:>8.1f} {wr:>9.1f} {clv:>7} {pos:>6}"
+
+
 def main():
     db = SessionLocal()
     try:
@@ -51,29 +70,51 @@ def main():
             print("Sin datos todavia — dejar correr el sistema en shadow y reintentar.")
             return
 
+        matches = {m.id: m for m in db.query(Match).filter(
+            Match.id.in_({p.match_id for p in picks})).all()}
+        n_clv = sum(1 for p in picks if p.clv_pct is not None)
+        print(f"Con CLV (vs cierre sharp sin margen): {n_clv}")
+
         print("\n=== Por bucket de EDGE ===")
-        print(f"{'edge':>10} {'n':>5} {'profit':>9} {'roi%':>8} {'winrate%':>9}")
+        print(f"{'edge':<12} {HEADER}")
         for lo, hi in EDGE_BUCKETS:
             bucket = [p for p in picks if lo <= (p.edge or 0) < hi]
-            n, profit, roi, wr = _roi(bucket)
-            print(f"{lo:>3}-{hi:<6} {n:>5} {profit:>9.2f} {roi:>8.1f} {wr:>9.1f}")
+            print(_row(f"{lo}-{hi}", bucket))
+
+        print("\n=== Por bucket de CUOTA ===")
+        print(f"{'cuota':<12} {HEADER}")
+        for lo, hi in ODDS_BUCKETS:
+            bucket = [p for p in picks if lo <= (p.best_odds or 0) < hi]
+            print(_row(f"{lo}-{hi}", bucket))
 
         print("\n=== Por LIGA ===")
         by_league = {}
         for p in picks:
-            m = db.query(Match).filter(Match.id == p.match_id).first()
+            m = matches.get(p.match_id)
             lt = (m.league_tier if m else None) or "?"
             by_league.setdefault(lt, []).append(p)
-        print(f"{'liga':>12} {'n':>5} {'profit':>9} {'roi%':>8} {'winrate%':>9}")
+        print(f"{'liga':<12} {HEADER}")
         for lt, ps in sorted(by_league.items()):
-            n, profit, roi, wr = _roi(ps)
-            print(f"{lt:>12} {n:>5} {profit:>9.2f} {roi:>8.1f} {wr:>9.1f}")
+            print(_row(lt, ps))
+
+        print("\n=== Por LIGA y MES ===")
+        by_lm = {}
+        for p in picks:
+            m = matches.get(p.match_id)
+            lt = (m.league_tier if m else None) or "?"
+            mes = p.created_at.strftime("%Y-%m") if p.created_at else "?"
+            by_lm.setdefault((lt, mes), []).append(p)
+        print(f"{'liga/mes':<12} {HEADER}")
+        for (lt, mes), ps in sorted(by_lm.items()):
+            print(_row(f"{lt[:4]} {mes}", ps))
 
         print("\n=== SHADOW vs ACTIVE ===")
         for label, flag in (("shadow", True), ("active", False)):
             ps = [p for p in picks if bool(p.is_shadow) == flag]
             n, profit, roi, wr = _roi(ps)
-            print(f"  {label:>7}: n={n} profit={profit:.2f}u roi={roi:.1f}% winrate={wr:.1f}%")
+            clv, pos = _clv(ps)
+            print(f"  {label:>7}: n={n} profit={profit:.2f}u roi={roi:.1f}% "
+                  f"winrate={wr:.1f}% clv={clv}% clv>0={pos}")
     finally:
         db.close()
 

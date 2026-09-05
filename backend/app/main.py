@@ -121,9 +121,13 @@ frontend_dist = Path(__file__).parent.parent.parent / "frontend-react" / "dist"
 if frontend_dist.exists() and (frontend_dist / "assets").exists():
     app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
 
+    _dist_root = frontend_dist.resolve()
+
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        file_path = frontend_dist / full_path
-        if file_path.is_file():
+        # Guard anti path-traversal: solo se sirven ficheros DENTRO de dist/
+        # (nginx ya rechaza '..' con 400, pero el backend no debe depender de eso).
+        file_path = (frontend_dist / full_path).resolve()
+        if file_path.is_file() and _dist_root in file_path.parents:
             return FileResponse(str(file_path))
         return FileResponse(str(frontend_dist / "index.html"))

@@ -46,6 +46,9 @@ export interface StatsData {
   winratePct: number;
   activePicks: number;
   shadowPicks: number;
+  clvN?: number;
+  avgClvPct?: number | null;
+  clvPositivePct?: number | null;
 }
 
 export interface StandingRow {
