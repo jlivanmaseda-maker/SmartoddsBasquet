@@ -104,6 +104,10 @@ SCORES (5 min): score_resolver.resolve_completed() [The Odds API /scores]
 | `scripts/backfill_clv.py` | Rellena CLV de picks ya resueltos (dry-run por defecto, `--apply`). |
 | `scripts/analyze_sharp_vs_pinnacle.py` | Diagnóstico (solo lectura): edge vs Pinnacle solo, movimiento de línea pick→cierre, sesgo de cada sharp. |
 | `scripts/void_opening_line_picks.py` | Anula picks pendientes a >PICK_MAX_HOURS_AHEAD (dry-run, `--apply`). |
+| `scripts/vigilante.py` / `.sh` | ⭐ Vigilante cada 10 min + `--resumen` diario con canario (19-oct-2026). Avisa por Telegram al cambiar. |
+| `scripts/fix_nba_teams.py` | Reenlaza partidos NBA a equipos `nba` (antes apuntaban a Summer League). Dry-run, `--apply`. |
+| `scripts/backfill_median.py` | Reconstruye mediana de blandas y Pinnacle al crear el pick para los picks viejos. Dry-run, `--apply`. |
+| `scripts/test_paso1.py` | Pruebas sin pytest de lo anterior (`cd backend && venv/bin/python ../scripts/test_paso1.py`). |
 
 ### Frontend (`frontend-react/`)
 React 19 + TypeScript + Vite + **TailwindCSS v4 + Recharts + react-router**. Look
@@ -141,6 +145,30 @@ Pinnacle publica la WNBA ~23h antes del tipoff y los picks se creaban de media
 - Para promover una liga hay que ver CLV medio > 0 con este régimen, no solo ROI.
 - `odds` (upsert) recibe cuotas EN VIVO tras el tipoff: el cierre se saca de
   `odds_history` (que solo guarda snapshot cuando la línea cambia).
+
+## 19-oct-2026: paso 1 del traspaso TT (sharp-v2) — sombra medible
+
+Inventario (sesión local SmartOddsBasquet, `inventario_2026-10-19.md`): 292 picks en
+sombra desde el 21-jun; el ROI a cuota cogida (+6,6 %) es el mismo que a la cuota justa
+de cierre (suerte, no ventaja); a mediana de las blandas +0,8 % ± 14; el ELO no aporta
+sobre el cierre de Pinnacle (z +0,65). Cambios (la regla de los picks NO cambia):
+
+- `rule_version` en cada pick (`sharp-v1` los viejos, `sharp-v2` desde este despliegue).
+  Cada regla se mide por separado y desde su hora de despliegue. Umbral para publicar:
+  ≥ 300 picks y ROI a mediana − 2 × error > 0 (`backtest_shadow.py`, sección por regla).
+- `median_soft_odds`, `n_soft_books`, `pinnacle_odds_at_pick`, `pinnacle_fair_at_pick`
+  en el pick; `scripts/backfill_median.py` los reconstruye para los viejos.
+- Equipos por nombre Y liga en `_find_or_create_team`; `scripts/fix_nba_teams.py`
+  reenlaza los 47 partidos de NBA que apuntaban a equipos de Summer League.
+- Se piden h2h + spreads + totals (`ODDS_API_MARKETS`; el `.env` de la VPS manda): 9
+  créditos por liga y llamada en vez de 3. Los picks siguen siendo solo de ganador.
+- `scripts/vigilante.sh` en cron cada 10 min y `--resumen` diario (09:07 UTC): canario
+  con entradas fijas (`scripts/canario_esperado.json`; regenerar con `--canario-generar`
+  SOLO si se cambia el cálculo a propósito), `quick_check` y resumen por regla. Estado en
+  `logs/vigilante_estado.json`.
+- `VERSION` en la raíz de la app (no versionado): `<commit corto> <fecha>`; `/status` lo
+  devuelve y el vigilante lo compara. `app/version.py` también fija `RULE_VERSION`.
+- El cupo de The Odds API sale a INFO una vez por ciclo (`creditos: restantes=`).
 
 ## Disciplina SHADOW (mientras se calibra)
 

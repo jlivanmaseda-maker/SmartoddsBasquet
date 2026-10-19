@@ -39,6 +39,21 @@ ESPN_LEAGUE_PATHS = {
 
 ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball"
 
+# Nombres de ESPN que no coinciden con los de The Odds API (comprobado el
+# 19-oct-2026 sobre la NBA 2025-26: solo difiere este). Sin esto el seed crea
+# un equipo duplicado y el ELO no llega al equipo de los partidos reales.
+ESPN_NAME_FIX = {
+    "LA Clippers": "Los Angeles Clippers",
+}
+
+
+def _es_exhibicion(nombre: str) -> bool:
+    """Partidos del All-Star / Rising Stars (ESPN los lista como completados):
+    "Team Stars", "Team Stripes", "World", "Team LeBron", "USA"... No son
+    equipos y no deben entrar en el ELO ni crear equipos en la BD."""
+    return nombre.startswith("Team ") or nombre in {"World", "USA", "Stars", "Stripes"}
+
+
 
 # ──────────────────────────────────────────────────────────────
 # Crawler ESPN
@@ -68,7 +83,7 @@ def fetch_espn_day(league_path: str, d: date, client: httpx.Client) -> list:
             home = away = None
             for c in competitors:
                 rec = {
-                    "name": c["team"]["displayName"],
+                    "name": ESPN_NAME_FIX.get(c["team"]["displayName"], c["team"]["displayName"]),
                     "score": int(c["score"]) if c.get("score") not in (None, "") else None,
                 }
                 if c.get("homeAway") == "home":
@@ -76,6 +91,8 @@ def fetch_espn_day(league_path: str, d: date, client: httpx.Client) -> list:
                 elif c.get("homeAway") == "away":
                     away = rec
             if not home or not away or home["score"] is None or away["score"] is None:
+                continue
+            if _es_exhibicion(home["name"]) or _es_exhibicion(away["name"]):
                 continue
             out.append({
                 "date": ev.get("date"),

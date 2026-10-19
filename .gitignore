@@ -20,6 +20,9 @@ backend/app/ml/*.pkl
 .env
 .env.local
 
+# Version desplegada (la escribe el despliegue: <commit corto> <fecha>)
+VERSION
+
 # Node / frontend build
 node_modules/
 frontend-react/dist/

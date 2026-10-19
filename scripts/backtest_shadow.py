@@ -59,6 +59,41 @@ def _row(label, picks):
     return f"{label:<12} {n:>5} {profit:>9.2f} {roi:>8.1f} {wr:>9.1f} {clv:>7} {pos:>6}"
 
 
+def _roi_se(picks, odds_attr):
+    """ROI (%) +- 2 errores estandar a la cuota `odds_attr`, solo won/lost con esa cuota.
+
+    Devuelve (n, roi, 2se) o (0, None, None). 1 unidad por pick.
+    """
+    vals = []
+    for p in picks:
+        if p.result not in ("won", "lost"):
+            continue
+        o = getattr(p, odds_attr, None)
+        if not o or o <= 1.0:
+            continue
+        vals.append((o - 1.0) if p.result == "won" else -1.0)
+    n = len(vals)
+    if n == 0:
+        return (0, None, None)
+    m = sum(vals) / n
+    var = sum((v - m) ** 2 for v in vals) / n
+    se = (var ** 0.5) / (n ** 0.5)
+    return (n, m * 100, 2 * se * 100)
+
+
+def _fmt_roi(t):
+    n, roi, e2 = t
+    return "   n=0    " if not n else f"{roi:+6.1f}%+-{e2:4.1f} (n={n})"
+
+
+def _regla_row(label, picks):
+    """Una regla: ROI a cuota cogida, a mediana de blandas y al cierre justo de Pinnacle."""
+    clv, pos = _clv(picks)
+    return (f"{label:<22} cogida {_fmt_roi(_roi_se(picks, 'best_odds'))}  "
+            f"mediana {_fmt_roi(_roi_se(picks, 'median_soft_odds'))}  "
+            f"cierre {_fmt_roi(_roi_se(picks, 'closing_odds'))}  clv {clv}% ({pos} >0)")
+
+
 def main():
     db = SessionLocal()
     try:
@@ -107,6 +142,16 @@ def main():
         print(f"{'liga/mes':<12} {HEADER}")
         for (lt, mes), ps in sorted(by_lm.items()):
             print(_row(f"{lt[:4]} {mes}", ps))
+
+        print("\n=== Por REGLA (cada una desde su despliegue; ROI +- 2 errores estandar) ===")
+        by_rule = {}
+        for p in picks:
+            by_rule.setdefault(p.rule_version or "?", []).append(p)
+        for rv, ps in sorted(by_rule.items()):
+            first = min((p.created_at for p in ps if p.created_at), default=None)
+            desde = first.strftime("%d-%b") if first else "?"
+            print(_regla_row(f"{rv} (desde {desde})", ps))
+        print("  Lectura TT: publicar solo con >= 300 picks y ROI a mediana - 2 errores > 0.")
 
         print("\n=== SHADOW vs ACTIVE ===")
         for label, flag in (("shadow", True), ("active", False)):

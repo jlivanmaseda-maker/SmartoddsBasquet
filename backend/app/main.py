@@ -24,6 +24,7 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.logging_config import setup_logging
 from app.db.database import init_db
+from app.version import APP_VERSION, RULE_VERSION
 
 setup_logging()
 
@@ -83,7 +84,8 @@ async def status():
     result = {
         "status": "ok",
         "sport": settings.SPORT,
-        "version": "0.1.0",
+        "version": APP_VERSION,
+        "rule_version": RULE_VERSION,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     if HAS_SCHEDULER:

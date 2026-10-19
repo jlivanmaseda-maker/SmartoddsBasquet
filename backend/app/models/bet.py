@@ -42,6 +42,15 @@ class Pick(Base):
 
     priority_score = Column(Float, nullable=True)        # edge * probabilidad
 
+    # Medicion como en TT (19-oct-2026): version de la regla que creo el pick
+    # (cada regla se mide desde su hora de despliegue), mediana de las casas
+    # blandas y cuota de Pinnacle (cruda y sin margen) en el instante del pick.
+    rule_version = Column(String(40), nullable=True)
+    median_soft_odds = Column(Float, nullable=True)
+    n_soft_books = Column(Integer, nullable=True)
+    pinnacle_odds_at_pick = Column(Float, nullable=True)
+    pinnacle_fair_at_pick = Column(Float, nullable=True)
+
     # Track record publico (firma HMAC verificable) — opcional, como en tenis
     public_id = Column(String(64), nullable=True, index=True)
     is_public = Column(Boolean, default=False)

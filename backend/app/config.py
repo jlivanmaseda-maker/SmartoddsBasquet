@@ -223,8 +223,11 @@ class Settings:
 
     # The Odds API regions (us para NBA/NCAA, eu para Euroliga/ACB)
     ODDS_API_REGIONS: str = os.getenv("ODDS_API_REGIONS", "us,eu,uk")
-    # Solo h2h para picks activos; spreads/totals son shadow -> reduce coste.
-    ODDS_API_MARKETS: str = os.getenv("ODDS_API_MARKETS", "h2h")
+    # 19-oct-2026: se capturan los tres mercados (h2h, spreads, totals) para
+    # tener su historia y su cierre; los picks siguen siendo solo de ganador.
+    # Coste: creditos = mercados x regiones por llamada (3x3=9, antes 3).
+    # OJO: el .env de la VPS fija ODDS_API_MARKETS y manda sobre este default.
+    ODDS_API_MARKETS: str = os.getenv("ODDS_API_MARKETS", "h2h,spreads,totals")
 
     # ================================================================
     # BOOKMAKERS — conjunto SHARP ESPECÍFICO DE BASKET (no el de tenis)

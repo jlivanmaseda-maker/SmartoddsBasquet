@@ -68,6 +68,9 @@ SPORT_KEY_TIER = {
 # Exchanges excluidos: cuotas infladas (no incluyen comision ~2-5%)
 EXCHANGE_BOOKMAKERS = {"betfair_ex_eu", "betfair_ex_uk", "matchbook", "smarkets"}
 
+# Ultimo cupo visto en las cabeceras de The Odds API (lo lee el vigilante en el log)
+LAST_CREDITS = {"remaining": None, "used": None}
+
 
 def _league_name(sport_key: str) -> str:
     """Nombre legible de la liga a partir del sport_key."""
@@ -86,17 +89,26 @@ def _find_or_create_team(db, name: str, league: str) -> Team:
     El alias es UNICO GLOBAL: si el nombre ya es alias de otro equipo, NO se
     reinserta (evita UniqueViolation que haria rollback del ciclo entero).
     """
-    # Buscar por nombre exacto
-    team = db.query(Team).filter(Team.name == name).first()
+    # Buscar por nombre exacto DENTRO de la liga. (19-oct-2026: antes se
+    # buscaba solo por nombre y los partidos de NBA quedaban enlazados a los
+    # equipos de la Summer League, que llevan el mismo nombre de franquicia
+    # pero otro tier y otro ELO.)
+    team = db.query(Team).filter(Team.name == name, Team.league == league).first()
     if team:
         return team
 
-    # Buscar por alias
+    # Buscar por alias (unico global): solo vale si el equipo es de esta liga
     alias = db.query(TeamNameAlias).filter(TeamNameAlias.alias == name).first()
     if alias:
         team = db.query(Team).filter(Team.id == alias.team_id).first()
-        if team:
+        if team and team.league == league:
             return team
+
+    # Compatibilidad: equipo con ese nombre sin liga informada -> adoptarlo
+    team = db.query(Team).filter(Team.name == name, Team.league.is_(None)).first()
+    if team:
+        team.league = league
+        return team
 
     # Crear nuevo equipo
     team = Team(name=name, league=league)
@@ -223,6 +235,7 @@ def fetch_league_odds(sport_key: str) -> list:
         remaining = resp.headers.get("x-requests-remaining")
         used = resp.headers.get("x-requests-used")
         if remaining:
+            LAST_CREDITS["remaining"], LAST_CREDITS["used"] = remaining, used
             logger.debug(f"Odds API credits: {remaining} remaining, {used} used")
 
         events = resp.json()
@@ -428,6 +441,12 @@ def fetch_all(db=None) -> dict:
             f"{total['errors']} errores, "
             f"{len(active_external_ids)} eventos activos"
         )
+        if LAST_CREDITS["remaining"] is not None:
+            # Una linea por ciclo a INFO: el vigilante avisa si el cupo baja.
+            logger.info(
+                f"Odds API creditos: restantes={LAST_CREDITS['remaining']} "
+                f"usados={LAST_CREDITS['used']}"
+            )
     except Exception as e:
         db.rollback()
         logger.error(f"Error commit fetch_all: {e}", exc_info=True)

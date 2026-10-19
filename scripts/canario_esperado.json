@@ -1,0 +1,21 @@
+{
+ "home": {
+  "best_odds": 2.0,
+  "best_bk": "fanduel",
+  "ref_prob": 0.5204506802721088,
+  "edge": 4.090136054421767,
+  "has_sharp": true,
+  "bookdif": 6.67,
+  "sharp_avg": 1.875,
+  "dispersion": 2.56,
+  "median_soft": 1.95,
+  "n_soft": 5,
+  "pin_raw": 1.87,
+  "pin_fair": 1.9122,
+  "priority": 2.1287140919292877
+ },
+ "away": null,
+ "devig": 0.5229591836734694,
+ "clv": 4.0,
+ "modelo": 0.6644530162977645
+}

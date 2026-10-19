@@ -60,6 +60,12 @@ def _run_migrations(eng, sqlite: bool):
     new_columns = [
         # (tabla, columna, tipo_pg, tipo_sqlite)
         ("matches", "elo_applied", "BOOLEAN DEFAULT FALSE", "BOOLEAN DEFAULT 0"),
+        # 19-oct-2026: medicion por regla, a mediana y contra Pinnacle
+        ("picks", "rule_version", "VARCHAR(40)", "VARCHAR(40)"),
+        ("picks", "median_soft_odds", "DOUBLE PRECISION", "FLOAT"),
+        ("picks", "n_soft_books", "INTEGER", "INTEGER"),
+        ("picks", "pinnacle_odds_at_pick", "DOUBLE PRECISION", "FLOAT"),
+        ("picks", "pinnacle_fair_at_pick", "DOUBLE PRECISION", "FLOAT"),
     ]
 
     if not new_columns:
@@ -79,6 +85,14 @@ def _run_migrations(eng, sqlite: bool):
                         ))
                 except Exception:
                     pass
+            # Los picks anteriores a la version de regla pertenecen a sharp-v1
+            # (regla original, 21-jun -> 19-oct-2026). Idempotente.
+            try:
+                conn.execute(text(
+                    "UPDATE picks SET rule_version = 'sharp-v1' WHERE rule_version IS NULL"
+                ))
+            except Exception:
+                pass
             conn.commit()
     except Exception as e:
         print(f"[DB] Warning: Migration error (safe to ignore): {e}")

@@ -30,6 +30,7 @@ from app.models.odds import Odds
 from app.models.bet import Pick, PickModelDetail
 from app.ml.model import predict_match
 from app.services.bookdif_calculator import calculate_bookdif, get_sharp_composite
+from app.version import RULE_VERSION
 
 logger = logging.getLogger("smartodds_basketball.value")
 
@@ -124,15 +125,27 @@ def _evaluate_side(odds_by_bk: dict, field: str, opp_field: str, model_prob: flo
         if bk not in EXCLUDED_SOFT and data.get(field) and data.get(field) > 1.0
     ]
     dispersion = None
+    median_soft = None
     if soft_vals:
         med = float(np.median(soft_vals))
         if med > 0:
             dispersion = round((best_odds / med - 1) * 100, 2)
+            median_soft = round(med, 4)
+
+    # Pinnacle en el instante del pick (cruda y sin margen), para medir despues
+    # el pick contra la casa fina y no solo contra la composite.
+    anchor = odds_by_bk.get(settings.PICK_ANCHOR_BOOKMAKER, {})
+    pin_raw = anchor.get(field)
+    pin_prob = _devig_prob(pin_raw, anchor.get(opp_field))
+    pin_fair = round(1.0 / pin_prob, 4) if pin_prob else None
 
     return {
         "best_odds": best_odds, "best_bk": best_bk,
         "ref_prob": ref_prob, "edge": edge, "has_sharp": has_sharp,
         "bookdif": bookdif, "sharp_avg": sharp_avg, "dispersion": dispersion,
+        "median_soft": median_soft, "n_soft": len(soft_vals),
+        "pin_raw": pin_raw if (pin_raw and pin_raw > 1.0) else None,
+        "pin_fair": pin_fair,
         "priority": edge * ref_prob,
     }
 
@@ -223,6 +236,11 @@ def generate_picks(db=None) -> int:
                 sharp_odds=round(best["sharp_avg"], 4) if best["sharp_avg"] else None,
                 dispersion=best["dispersion"],
                 priority_score=best["priority"],
+                rule_version=RULE_VERSION,
+                median_soft_odds=best["median_soft"],
+                n_soft_books=best["n_soft"],
+                pinnacle_odds_at_pick=best["pin_raw"],
+                pinnacle_fair_at_pick=best["pin_fair"],
                 is_active=True,
                 is_shadow=is_shadow,
                 shadow_reasons=",".join(reasons) or None,
