@@ -151,6 +151,17 @@ def main():
             first = min((p.created_at for p in ps if p.created_at), default=None)
             desde = first.strftime("%d-%b") if first else "?"
             print(_regla_row(f"{rv} (desde {desde})", ps))
+            # sharp-v3: separar handicap y total, con los puntos de linea frente al cierre
+            por_mercado = {}
+            for p in ps:
+                m = "handicap" if p.bet_type.startswith("spread_") else \
+                    "total" if p.bet_type.startswith("total_points_") else "ganador"
+                por_mercado.setdefault(m, []).append(p)
+            if len(por_mercado) > 1:
+                for m, pm in sorted(por_mercado.items()):
+                    lc = [p.line_clv for p in pm if getattr(p, "line_clv", None) is not None]
+                    extra = f"  linea vs cierre {sum(lc) / len(lc):+.2f} pts (n={len(lc)})" if lc else ""
+                    print(_regla_row(f"   {m}", pm) + extra)
         print("  Lectura TT: publicar solo con >= 300 picks y ROI a mediana - 2 errores > 0.")
 
         print("\n=== SHADOW vs ACTIVE ===")

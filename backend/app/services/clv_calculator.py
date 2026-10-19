@@ -105,6 +105,70 @@ def find_closing_line(db: Session, match: Match, bet_type: str) -> Optional[dict
     return None
 
 
+def find_closing_line_market(db: Session, match: Match, bet_type: str) -> Optional[dict]:
+    """Cierre de Pinnacle para un pick de handicap/total (sharp-v3): ultimo snapshot pre-tipoff
+    con linea y precios del mercado. Devuelve {'ref', 'recorded_at'} (ref de line_markets) o None."""
+    from app.services import line_markets
+    parsed = line_markets.lado_y_linea(bet_type)
+    if not parsed or not match.commence_time:
+        return None
+    mercado, _, _ = parsed
+    cutoff = _naive_utc(match.commence_time)
+    bk = settings.PICK_ANCHOR_BOOKMAKER
+    if mercado == "spread":
+        cond = (OddsHistory.spread_line.isnot(None), OddsHistory.odds_spread_home.isnot(None),
+                OddsHistory.odds_spread_away.isnot(None))
+    else:
+        cond = (OddsHistory.total_line.isnot(None), OddsHistory.odds_over.isnot(None),
+                OddsHistory.odds_under.isnot(None))
+    row = (
+        db.query(OddsHistory)
+        .filter(OddsHistory.match_id == match.id, OddsHistory.bookmaker == bk,
+                OddsHistory.recorded_at <= cutoff, *cond)
+        .order_by(OddsHistory.recorded_at.desc())
+        .first()
+    )
+    if not row:
+        return None
+    obk = {bk: {"spread_line": row.spread_line, "odds_spread_home": row.odds_spread_home,
+                "odds_spread_away": row.odds_spread_away, "total_line": row.total_line,
+                "odds_over": row.odds_over, "odds_under": row.odds_under}}
+    ref = line_markets.referencia(obk, mercado, match.league_tier or "")
+    if not ref:
+        return None
+    return {"ref": ref, "recorded_at": row.recorded_at}
+
+
+def _clv_linea(db: Session, pick: Pick, match: Match) -> bool:
+    """CLV de un pick de handicap/total: cuota justa de Pinnacle al cierre A NUESTRA LINEA
+    (misma normal que al crear el pick) y puntos de linea ganados frente al cierre."""
+    from app.services import line_markets
+    parsed = line_markets.lado_y_linea(pick.bet_type)
+    if not parsed:
+        return False
+    mercado, lado, linea = parsed
+    closing = find_closing_line_market(db, match, pick.bet_type)
+    if not closing:
+        return False
+    ref = closing["ref"]
+    p_gana, p_push = line_markets.prob_lado_a_linea(ref, mercado, lado, linea)
+    if p_gana <= 0:
+        return False
+    fair = (1.0 - p_push) / p_gana
+    pick.closing_odds = round(fair, 4)
+    pick.closing_bookmaker = settings.PICK_ANCHOR_BOOKMAKER
+    pick.pinnacle_closing_odds = ref["cuota_a"] if lado in ("home", "over") else ref["cuota_b"]
+    pick.closing_line = ref["linea"]
+    # puntos ganados: spread home -5.5 con cierre -7 -> +1.5; away +5.5 con cierre local -7 (visitante +7) -> -1.5
+    if mercado == "spread":
+        linea_cierre_lado = ref["linea"] if lado == "home" else -ref["linea"]
+        pick.line_clv = round(linea - linea_cierre_lado, 2)
+    else:
+        pick.line_clv = round((ref["linea"] - linea) if lado == "over" else (linea - ref["linea"]), 2)
+    pick.clv_pct = clv_pct(pick.best_odds, fair)
+    return pick.clv_pct is not None
+
+
 def compute_pick_clv(db: Session, pick: Pick, match: Optional[Match] = None) -> bool:
     """Rellena closing_odds / closing_bookmaker / pinnacle_closing_odds / clv_pct.
 
@@ -113,6 +177,8 @@ def compute_pick_clv(db: Session, pick: Pick, match: Optional[Match] = None) -> 
     match = match or db.get(Match, pick.match_id)
     if not match or not pick.best_odds:
         return False
+    if not _side_fields(pick.bet_type):
+        return _clv_linea(db, pick, match)          # sharp-v3: handicap y total
     closing = find_closing_line(db, match, pick.bet_type)
     if not closing:
         return False

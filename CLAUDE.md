@@ -170,6 +170,26 @@ sobre el cierre de Pinnacle (z +0,65). Cambios (la regla de los picks NO cambia)
   devuelve y el vigilante lo compara. `app/version.py` también fija `RULE_VERSION`.
 - El cupo de The Odds API sale a INFO una vez por ciclo (`creditos: restantes=`).
 
+## 20-oct-2026: sharp-v3, handicap y total en sombra
+
+El examen v0 (sesion local, `examen_v0_2026-10-19.md`) mostro que un modelo de arboles no aporta sobre el cierre
+de Pinnacle; la ventaja, si existe, esta en el timing frente a las blandas. sharp-v3 aplica el metodo sharp a
+handicap y total (`services/line_markets.py`):
+
+- Referencia: linea y precios de Pinnacle (`PICK_ANCHOR_BOOKMAKER`), sin margen. Las blandas casi nunca comparten
+  la linea (4-6 de 22) y a linea igual pagan menos, asi que el valor esta en la LINEA DESFASADA.
+- Conversion: margen y total ~ normal con desviacion fija por liga (`LINE_SIGMA_SPREAD/TOTAL`), media implicada
+  por la linea de Pinnacle; para cada blanda, probabilidad de ganar y de push a SU linea (continuidad: puntos
+  enteros) y edge = p_gana * cuota + p_push - 1. Limites: distancia maxima de linea (`LINE_MAX_DIST_*`), edge
+  3-12 %, cuota 1.20-5.00, ventana 24 h y Pinnacle presente (los mismos del ganador).
+- Picks siempre en sombra, `rule_version = sharp-v3`, bet_type `spread_home_-5.5` / `spread_away_5.5` /
+  `total_points_over_215.5`; `line_value` (linea apostada), `ref_line` (Pinnacle al crear). Guard de conflicto POR
+  MERCADO: un partido puede tener ganador + handicap + total activos.
+- CLV de linea: cuota justa de Pinnacle al cierre A NUESTRA LINEA (misma normal) -> `clv_pct`; `closing_line` y
+  `line_clv` (puntos ganados frente al cierre). `backtest_shadow.py` y el resumen del vigilante separan por mercado.
+- Desactivable con `LINE_MARKETS_ENABLED=false`. Pruebas: `scripts/test_sharpv3.py`; simulacion sobre una copia
+  de la BD: `scripts/simular_sharpv3.py` (6 picks en dia y medio de pretemporada; 3-5/dia con la NBA en marcha).
+
 ## Disciplina SHADOW (mientras se calibra)
 
 TODAS las ligas en `SHADOW_TIERS = {nba, wnba, ncaab, euroleague, nbl}`. Los picks

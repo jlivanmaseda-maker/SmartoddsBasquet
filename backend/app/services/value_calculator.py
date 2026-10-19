@@ -30,7 +30,8 @@ from app.models.odds import Odds
 from app.models.bet import Pick, PickModelDetail
 from app.ml.model import predict_match
 from app.services.bookdif_calculator import calculate_bookdif, get_sharp_composite
-from app.version import RULE_VERSION
+from app.version import RULE_VERSION, RULE_VERSION_LINES
+from app.services import line_markets
 
 logger = logging.getLogger("smartodds_basketball.value")
 
@@ -42,11 +43,75 @@ EXCLUDED_SOFT = SHARP_BKS | EXCHANGE_BKS
 
 
 def _odds_by_bk(odds_rows) -> dict:
-    """{bookmaker: {'odds_home':x, 'odds_away':y}} a partir de filas Odds."""
+    """{bookmaker: {'odds_home':x, 'odds_away':y, spread_line, odds_spread_*, total_line, odds_over/under}}."""
     d = {}
     for o in odds_rows:
-        d[o.bookmaker] = {"odds_home": o.odds_home, "odds_away": o.odds_away}
+        d[o.bookmaker] = {
+            "odds_home": o.odds_home, "odds_away": o.odds_away,
+            "spread_line": o.spread_line, "odds_spread_home": o.odds_spread_home,
+            "odds_spread_away": o.odds_spread_away,
+            "total_line": o.total_line, "odds_over": o.odds_over, "odds_under": o.odds_under,
+        }
     return d
+
+
+def _mercado_de(bet_type: str) -> str:
+    """'match_winner', 'spread' o 'total' a partir del bet_type (guard de conflicto por mercado)."""
+    if bet_type.startswith("spread_"):
+        return "spread"
+    if bet_type.startswith("total_points_"):
+        return "total"
+    return "match_winner"
+
+
+def _crear_pick_linea(db, match, obk: dict, mercado: str, now) -> bool:
+    """Un pick de handicap ('spread') o total ('total') en sombra si alguna blanda lo da con valor."""
+    ref = line_markets.referencia(obk, mercado, match.league_tier or "")
+    if not ref:
+        return False
+    lados = ("home", "away") if mercado == "spread" else ("over", "under")
+    best = None
+    for lado in lados:
+        ev = line_markets.evaluar_lado(obk, mercado, lado, ref)
+        if ev and (best is None or ev["priority"] > best["priority"]):
+            ev["lado"] = lado
+            best = ev
+    if not best:
+        return False
+    reasons = [mercado]
+    if (match.league_tier or "") in settings.SHADOW_TIERS:
+        reasons.append(match.league_tier)
+    pick = Pick(
+        match_id=match.id,
+        bet_type=best["bet_type"],
+        best_odds=best["cuota"],
+        best_bookmaker=best["bk"],
+        estimated_probability=best["p_gana"],
+        edge=best["edge"],
+        bookdif=None,
+        sharp_odds=best["pin_fair"],
+        dispersion=None,
+        priority_score=best["priority"],
+        rule_version=RULE_VERSION_LINES,
+        median_soft_odds=best["median_misma_linea"],
+        n_soft_books=best["n_misma_linea"],
+        pinnacle_odds_at_pick=best["pin_raw"],
+        pinnacle_fair_at_pick=best["pin_fair"],
+        line_value=best["linea_apuesta"],
+        ref_line=best["ref_linea"],
+        is_active=True,
+        is_shadow=True,                       # sharp-v3 siempre en sombra
+        shadow_reasons=",".join(reasons),
+        created_at=now,
+    )
+    db.add(pick)
+    db.flush()
+    logger.info(
+        f"[SHADOW/{RULE_VERSION_LINES}] {pick.bet_type} {match.home_team} vs {match.away_team} "
+        f"@ {best['cuota']} ({best['bk']}) edge={best['edge']:.1f}% linea_pinnacle={best['ref_linea']} "
+        f"p_push={best['p_push']:.3f}"
+    )
+    return True
 
 
 def _devig_prob(this_odds, other_odds):
@@ -177,10 +242,13 @@ def generate_picks(db=None) -> int:
             if ct - now > max_ahead:
                 continue
 
-            # Guard de conflicto: ya hay pick activo
-            if db.query(Pick).filter(
+            # Guard de conflicto POR MERCADO (sharp-v3): un pick activo de ganador no bloquea
+            # el de handicap ni el de total del mismo partido, y viceversa.
+            activos = {_mercado_de(p.bet_type) for p in db.query(Pick).filter(
                 Pick.match_id == match.id, Pick.is_active == True  # noqa: E712
-            ).first():
+            ).all()}
+            mercados_pendientes = [m for m in ("match_winner", "spread", "total") if m not in activos]
+            if not mercados_pendientes:
                 continue
 
             odds_rows = db.query(Odds).filter(Odds.match_id == match.id).all()
@@ -195,6 +263,14 @@ def generate_picks(db=None) -> int:
             anchor_ok = bool(anchor.get("odds_home") and anchor.get("odds_away"))
             hours_ahead = (ct - now).total_seconds() / 3600.0
             if not anchor_ok and hours_ahead > settings.PICK_WAIT_FOR_ANCHOR_HOURS:
+                continue
+
+            # sharp-v3: handicap y total (siempre en sombra); independientes del ganador
+            if settings.LINE_MARKETS_ENABLED and anchor_ok:
+                for mercado in ("spread", "total"):
+                    if mercado in mercados_pendientes and _crear_pick_linea(db, match, obk, mercado, now):
+                        created += 1
+            if "match_winner" not in mercados_pendientes:
                 continue
 
             # Modelo (fallback) — para lados sin sharp

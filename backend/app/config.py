@@ -189,6 +189,22 @@ class Settings:
     PICK_WAIT_FOR_ANCHOR_HOURS: float = float(os.getenv("PICK_WAIT_FOR_ANCHOR_HOURS", "12"))
 
     # ================================================================
+    # sharp-v3 (20-oct-2026): handicap y total en SOMBRA con el metodo sharp
+    # ================================================================
+    # La linea de Pinnacle se convierte a cualquier otra linea con una normal de
+    # desviacion fija por liga (margen y total; sd de residuos del examen v0,
+    # NBA ~13 / 18, redondeadas hacia el mercado). Ver services/line_markets.py.
+    LINE_MARKETS_ENABLED: bool = os.getenv("LINE_MARKETS_ENABLED", "true").lower() == "true"
+    LINE_SIGMA_SPREAD: dict = {"nba": 12.5, "wnba": 11.5, "euroleague": 11.0, "ncaab": 13.0, "nba_sl": 13.0,
+                               "nbl": 12.0, "default": 12.5}
+    LINE_SIGMA_TOTAL: dict = {"nba": 18.0, "wnba": 16.5, "euroleague": 15.5, "ncaab": 18.0, "nba_sl": 19.0,
+                              "nbl": 17.0, "default": 18.0}
+    # Distancia maxima entre la linea de la blanda y la de Pinnacle (puntos): mas lejos,
+    # la normal ya no es fiable y suele ser una linea alternativa, no una desfasada.
+    LINE_MAX_DIST_SPREAD: float = float(os.getenv("LINE_MAX_DIST_SPREAD", "3.0"))
+    LINE_MAX_DIST_TOTAL: float = float(os.getenv("LINE_MAX_DIST_TOTAL", "5.0"))
+
+    # ================================================================
     # SIMULATED ANNEALING (recalibracion semanal de pesos)
     # ================================================================
     SA_MAX_ITERATIONS: int = int(os.getenv("SA_MAX_ITERATIONS", "5000"))

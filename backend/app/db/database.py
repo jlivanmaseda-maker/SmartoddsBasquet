@@ -66,6 +66,11 @@ def _run_migrations(eng, sqlite: bool):
         ("picks", "n_soft_books", "INTEGER", "INTEGER"),
         ("picks", "pinnacle_odds_at_pick", "DOUBLE PRECISION", "FLOAT"),
         ("picks", "pinnacle_fair_at_pick", "DOUBLE PRECISION", "FLOAT"),
+        # 20-oct-2026: sharp-v3 (handicap y total)
+        ("picks", "line_value", "DOUBLE PRECISION", "FLOAT"),
+        ("picks", "ref_line", "DOUBLE PRECISION", "FLOAT"),
+        ("picks", "closing_line", "DOUBLE PRECISION", "FLOAT"),
+        ("picks", "line_clv", "DOUBLE PRECISION", "FLOAT"),
     ]
 
     if not new_columns:

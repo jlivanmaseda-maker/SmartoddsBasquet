@@ -224,9 +224,13 @@ def check_cordura(db, ahora: datetime, settings) -> tuple:
         if not odds or odds <= 1.0:
             fallos.append(f"#{p.id} cuota {odds}")
             continue
-        edge = (prob - 1.0 / odds) / (1.0 / odds) * 100.0
-        if p.edge is None or abs(edge - p.edge) > 0.1:
-            fallos.append(f"#{p.id} edge guardado {p.edge} y recalculado {edge:.2f}")
+        if p.bet_type.startswith("match_winner"):
+            # el edge del ganador es p*cuota-1; en handicap/total entra el push (sharp-v3): no se recalcula aqui
+            edge = (prob - 1.0 / odds) / (1.0 / odds) * 100.0
+            if p.edge is None or abs(edge - p.edge) > 0.1:
+                fallos.append(f"#{p.id} edge guardado {p.edge} y recalculado {edge:.2f}")
+        elif getattr(p, "line_value", None) is None or getattr(p, "ref_line", None) is None:
+            fallos.append(f"#{p.id} pick de linea sin line_value/ref_line")
         if not (settings.SYSTEM_MIN_EDGE - 0.01 <= (p.edge or 0) <= settings.SA_MAX_EDGE + 0.01):
             fallos.append(f"#{p.id} edge {p.edge} fuera de {settings.SYSTEM_MIN_EDGE}-{settings.SA_MAX_EDGE}")
         if p.median_soft_odds and p.median_soft_odds > odds + 1e-9:
@@ -282,6 +286,21 @@ def check_bd(db_path: Path) -> tuple:
 # Canario (entradas fijas -> salida identica)
 # ──────────────────────────────────────────────────────────────
 
+CANARIO_OBK_LINEAS = {
+    # Pinnacle en -5.5 / 221.5; blandas desfasadas: gtbets en -3.5 (dos puntos: valor al local; con un
+    # punto a 1.91 el edge es solo +2 %), fanduel 219.5 (valor al over)
+    "pinnacle": {"spread_line": -5.5, "odds_spread_home": 1.93, "odds_spread_away": 1.95,
+                 "total_line": 221.5, "odds_over": 1.92, "odds_under": 1.96},
+    "betonlineag": {"spread_line": -5.5, "odds_spread_home": 1.91, "odds_spread_away": 1.95,
+                    "total_line": 222.0, "odds_over": 1.91, "odds_under": 1.95},
+    "gtbets": {"spread_line": -3.5, "odds_spread_home": 1.91, "odds_spread_away": 1.91,
+               "total_line": 221.5, "odds_over": 1.90, "odds_under": 1.90},
+    "fanduel": {"spread_line": -5.5, "odds_spread_home": 1.91, "odds_spread_away": 1.91,
+                "total_line": 219.5, "odds_over": 1.91, "odds_under": 1.91},
+    "bovada": {"spread_line": -6.0, "odds_spread_home": 1.95, "odds_spread_away": 1.87,
+               "total_line": 221.5, "odds_over": 1.91, "odds_under": 1.91},
+}
+
 CANARIO_OBK = {
     "pinnacle": {"odds_home": 1.87, "odds_away": 2.05},
     "betonlineag": {"odds_home": 1.88, "odds_away": 2.02},
@@ -310,13 +329,23 @@ def canario_calcular() -> dict:
 
     home = _evaluate_side(CANARIO_OBK, "odds_home", "odds_away", 0.5)
     away = _evaluate_side(CANARIO_OBK, "odds_away", "odds_home", 0.5)
-    return {
+    out = {
         "home": home,
         "away": away,
         "devig": _devig_prob(1.87, 2.05),
         "clv": clv_pct(2.00, 1.9231),
         "modelo": predict_match(T(1550.0), T(1480.0)),
     }
+    # sharp-v3: referencia y mejor lado de handicap y total con entradas fijas (liga nba)
+    from app.services import line_markets
+    for mercado, lados in (("spread", ("home", "away")), ("total", ("over", "under"))):
+        ref = line_markets.referencia(CANARIO_OBK_LINEAS, mercado, "nba")
+        out[f"{mercado}_ref"] = {k: ref[k] for k in ("linea", "mu", "sd", "p_ref")} if ref else None
+        for lado in lados:
+            ev = line_markets.evaluar_lado(CANARIO_OBK_LINEAS, mercado, lado, ref) if ref else None
+            out[f"{mercado}_{lado}"] = ({k: ev[k] for k in ("bk", "cuota", "linea_soft", "p_gana", "p_push",
+                                                            "edge", "pin_fair", "bet_type")} if ev else None)
+    return out
 
 
 def _plano(d, prefijo=""):
@@ -398,8 +427,10 @@ def resumen_sombra(db, ahora: datetime) -> list[str]:
         clv = (f"CLV {sum(clvs) / len(clvs):+.1f}% ({100 * sum(1 for c in clvs if c > 0) / len(clvs):.0f}% >0)"
                if clvs else "sin CLV")
         first = min((p.created_at for p in lst if p.created_at), default=None)
+        lc = [p.line_clv for p in lst if getattr(p, "line_clv", None) is not None]
+        linea_txt = f"; linea vs cierre {sum(lc) / len(lc):+.2f} pts (n={len(lc)})" if lc else ""
         lineas.append(f"{rv} (desde {first.strftime('%d-%b') if first else '?'}): "
-                      f"cogida {_f(_roi_se(cog))}; mediana {_f(_roi_se(med))}; {clv}")
+                      f"cogida {_f(_roi_se(cog))}; mediana {_f(_roi_se(med))}; {clv}{linea_txt}")
     return lineas
 
 

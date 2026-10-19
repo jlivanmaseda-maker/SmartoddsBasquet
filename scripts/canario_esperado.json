@@ -17,5 +17,39 @@
  "away": null,
  "devig": 0.5229591836734694,
  "clv": 4.0,
- "modelo": 0.6644530162977645
+ "modelo": 0.6644530162977645,
+ "spread_ref": {
+  "linea": -5.5,
+  "mu": 5.580755338725431,
+  "sd": 12.5,
+  "p_ref": 0.502577319587629
+ },
+ "spread_home": {
+  "bk": "gtbets",
+  "cuota": 1.91,
+  "linea_soft": -3.5,
+  "p_gana": 0.5661026883795592,
+  "p_push": 0.0,
+  "edge": 8.125613480495808,
+  "pin_fair": 1.7665,
+  "bet_type": "spread_home_-3.5"
+ },
+ "spread_away": null,
+ "total_ref": {
+  "linea": 221.5,
+  "mu": 221.73258022929335,
+  "sd": 18.0,
+  "p_ref": 0.5051546391752577
+ },
+ "total_over": {
+  "bk": "fanduel",
+  "cuota": 1.91,
+  "linea_soft": 219.5,
+  "p_gana": 0.5493551238437484,
+  "p_push": 0.0,
+  "edge": 4.926828654155946,
+  "pin_fair": 1.8203,
+  "bet_type": "total_points_over_219.5"
+ },
+ "total_under": null
 }

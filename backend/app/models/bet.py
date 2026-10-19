@@ -51,6 +51,14 @@ class Pick(Base):
     pinnacle_odds_at_pick = Column(Float, nullable=True)
     pinnacle_fair_at_pick = Column(Float, nullable=True)
 
+    # sharp-v3 (20-oct-2026): mercados de linea. line_value = linea apostada (convencion del
+    # bet_type); ref_line = linea de Pinnacle al crear el pick; closing_line = linea de Pinnacle
+    # al cierre; line_clv = puntos ganados frente al cierre (positivo = mejor linea que el cierre).
+    line_value = Column(Float, nullable=True)
+    ref_line = Column(Float, nullable=True)
+    closing_line = Column(Float, nullable=True)
+    line_clv = Column(Float, nullable=True)
+
     # Track record publico (firma HMAC verificable) — opcional, como en tenis
     public_id = Column(String(64), nullable=True, index=True)
     is_public = Column(Boolean, default=False)

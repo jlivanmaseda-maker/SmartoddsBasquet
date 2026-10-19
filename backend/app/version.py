@@ -30,3 +30,7 @@ APP_VERSION: str = _read_version()
 #           las blandas, Pinnacle y la version (19-oct-2026), y se capturan
 #           spreads y totales.
 RULE_VERSION: str = os.getenv("RULE_VERSION", "sharp-v2")
+
+# sharp-v3: picks de handicap y total (20-oct-2026), linea de Pinnacle convertida a la
+#           linea de cada blanda con una normal por liga. Se mide aparte del ganador.
+RULE_VERSION_LINES: str = os.getenv("RULE_VERSION_LINES", "sharp-v3")
