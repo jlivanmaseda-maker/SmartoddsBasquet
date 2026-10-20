@@ -58,6 +58,7 @@ def test_referencia_y_lados():
     # a la MISMA linea con precios peores (fanduel 1.91/1.91) no hay valor; gtbets en -3.5 (dos puntos) si
     home = lm.evaluar_lado(vigilante.CANARIO_OBK_LINEAS, "spread", "home", ref)
     assert home and home["bk"] == "gtbets" and home["linea_soft"] == -3.5, home
+    assert home["n_misma_linea"] == 1 and home["median_misma_linea"] == 1.91, home   # solo gtbets esta en -3.5
     assert home["bet_type"] == "spread_home_-3.5" and 3.0 <= home["edge"] <= 12.0, home["edge"]
     away = lm.evaluar_lado(vigilante.CANARIO_OBK_LINEAS, "spread", "away", ref)
     assert away is None or away["bk"] == "bovada", away  # bovada -6.0 al visitante (+6) podria tener valor
@@ -111,6 +112,8 @@ def test_generate_picks_tres_mercados():
             else:
                 assert p.rule_version == RULE_VERSION_LINES and p.is_shadow and p.line_value is not None
                 assert p.ref_line in (-5.5, 221.5) and p.pinnacle_fair_at_pick and p.edge >= 3.0
+                # mediana a la linea apostada: nunca por encima de la cuota cogida (cordura del vigilante)
+                assert p.n_soft_books >= 1 and p.median_soft_odds <= p.best_odds + 1e-9, (p.bet_type, p.median_soft_odds, p.best_odds)
         # segunda pasada: no duplica (guard por mercado)
         assert value_calculator.generate_picks(db) == 0
     finally:

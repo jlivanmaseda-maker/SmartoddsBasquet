@@ -146,21 +146,20 @@ def evaluar_lado(odds_by_bk: dict, mercado: str, lado: str, ref: dict) -> Option
         campo_linea, campo_cuota = "total_line", ("odds_over" if lado == "over" else "odds_under")
         max_dist = settings.LINE_MAX_DIST_TOTAL
     mejor = None
-    precios_misma_linea = []
+    precios_por_linea: dict = {}          # linea de la blanda -> precios del lado (para la mediana)
     for bk, data in odds_by_bk.items():
         if bk in EXCLUDED_SOFT:
             continue
         linea, cuota = data.get(campo_linea), data.get(campo_cuota)
         if linea is None or not cuota or cuota <= 1.0:
             continue
+        precios_por_linea.setdefault(float(linea), []).append(cuota)
         if cuota < settings.SYSTEM_MIN_ODDS or cuota > settings.SYSTEM_MAX_ODDS:
             continue
         if abs(float(linea) - ref["linea"]) > max_dist + 1e-9:
             continue
         p_gana, p_push = _prob_lado(ref, mercado, lado, float(linea))
         edge = edge_pct(p_gana, p_push, cuota)
-        if abs(float(linea) - ref["linea"]) < 1e-9:
-            precios_misma_linea.append(cuota)
         if edge < settings.SYSTEM_MIN_EDGE or edge > settings.SA_MAX_EDGE:
             continue
         if mejor is None or edge > mejor["edge"]:
@@ -168,6 +167,9 @@ def evaluar_lado(odds_by_bk: dict, mercado: str, lado: str, ref: dict) -> Option
                      "edge": edge}
     if mejor is None:
         return None
+    # Mediana y numero de blandas A LA LINEA APOSTADA (20-oct-2026, aviso del vigilante en el pick #298:
+    # a la linea de Pinnacle la mediana no es comparable con la cuota cogida a la linea desfasada).
+    precios_misma_linea = precios_por_linea.get(mejor["linea_soft"], [])
     # Pinnacle a NUESTRA linea: probabilidad y cuota justa (con el push devuelto)
     pg_ref, pp_ref = _prob_lado(ref, mercado, lado, mejor["linea_soft"])
     mejor["pin_fair"] = round((1.0 - pp_ref) / pg_ref, 4) if pg_ref > 0 else None
