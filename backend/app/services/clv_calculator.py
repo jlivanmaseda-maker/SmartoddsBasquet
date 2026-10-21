@@ -151,7 +151,10 @@ def _clv_linea(db: Session, pick: Pick, match: Match) -> bool:
     if not closing:
         return False
     ref = closing["ref"]
-    p_gana, p_push = line_markets.prob_lado_a_linea(ref, mercado, lado, linea)
+    # prob_lado_a_linea espera la linea del LOCAL (convencion de odds_fetcher); el pick de visitante
+    # guarda su propia linea (= -linea del local). 21-oct-2026: sin esto el CLV del visitante salia invertido.
+    linea_home = -linea if (mercado == "spread" and lado == "away") else linea
+    p_gana, p_push = line_markets.prob_lado_a_linea(ref, mercado, lado, linea_home)
     if p_gana <= 0:
         return False
     fair = (1.0 - p_push) / p_gana

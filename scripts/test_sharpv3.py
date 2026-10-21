@@ -138,6 +138,10 @@ def test_liquidacion_y_clv():
             Pick(match_id=m.id, bet_type="spread_away_6.0", best_odds=1.91, best_bookmaker="bovada",
                  estimated_probability=0.5, edge=3.5, rule_version=RULE_VERSION_LINES, line_value=6.0,
                  ref_line=-5.5, is_active=True, is_shadow=True, created_at=datetime.utcnow()),
+            # visitante +9 (cierre: local -7 -> visitante +7): dos puntos mejor que el cierre, gana con margen 6
+            Pick(match_id=m.id, bet_type="spread_away_9.0", best_odds=1.91, best_bookmaker="coolbet",
+                 estimated_probability=0.55, edge=4.0, rule_version=RULE_VERSION_LINES, line_value=9.0,
+                 ref_line=-5.5, is_active=True, is_shadow=True, created_at=datetime.utcnow()),
             Pick(match_id=m.id, bet_type="total_points_over_219.5", best_odds=1.91, best_bookmaker="fanduel",
                  estimated_probability=0.55, edge=4.0, rule_version=RULE_VERSION_LINES, line_value=219.5,
                  ref_line=221.5, is_active=True, is_shadow=True, created_at=datetime.utcnow()),
@@ -151,6 +155,7 @@ def test_liquidacion_y_clv():
         res = {p.bet_type: (p.result, p.profit_units) for p in db.query(Pick).filter(Pick.match_id == m.id)}
         assert res["spread_home_-4.5"] == ("won", round(0.91, 4)), res
         assert res["spread_away_6.0"] == ("void", 0.0), res
+        assert res["spread_away_9.0"] == ("won", round(0.91, 4)), res
         assert res["total_points_over_219.5"] == ("lost", -1.0), res
         # CLV de linea: home -4.5 contra cierre -7 -> +2.5 puntos; el cierre dice que el local era mas
         # favorito, asi que la cuota justa de Pinnacle a -4.5 es menor que 1.91 (CLV positivo)
@@ -158,6 +163,10 @@ def test_liquidacion_y_clv():
         assert p_home.closing_line == -7.0 and cerca(p_home.line_clv, 2.5), (p_home.closing_line, p_home.line_clv)
         assert p_home.clv_pct is not None and p_home.closing_odds is not None, (p_home.clv_pct, p_home.closing_odds)
         assert p_home.closing_odds < 1.91 and p_home.clv_pct > 0, (p_home.clv_pct, p_home.closing_odds)
+        # CLV del visitante: +9 contra cierre visitante +7 -> +2 puntos y CLV positivo (21-oct: antes salia invertido)
+        p_away = db.query(Pick).filter(Pick.match_id == m.id, Pick.bet_type == "spread_away_9.0").first()
+        assert p_away.closing_line == -7.0 and cerca(p_away.line_clv, 2.0), (p_away.closing_line, p_away.line_clv)
+        assert p_away.clv_pct is not None and p_away.clv_pct > 0 and p_away.closing_odds < 1.91, (p_away.clv_pct, p_away.closing_odds)
         p_over = db.query(Pick).filter(Pick.match_id == m.id, Pick.bet_type == "total_points_over_219.5").first()
         assert p_over.closing_line == 224.5 and cerca(p_over.line_clv, 5.0) and p_over.clv_pct > 0
         print("ok liquidacion (gana / push / pierde) y CLV de linea:",
