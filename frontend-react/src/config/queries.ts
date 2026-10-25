@@ -110,3 +110,81 @@ export const DASHBOARD_QUERY = `
     systemConfig
   }
 `;
+
+/** Pagina /picks (25-oct-2026): la sombra por regla y mercado + estado del sistema (ver backend schemas/sombra.py). */
+export const SHADOW_RULES_QUERY = `
+  query ShadowRules($dias: Int) {
+    systemStatus {
+      version
+      reglaGanador
+      reglaLineas
+      lineasActivas
+      vigilanteOk
+      vigilanteFallos
+      vigilanteActualizado
+      creditosRestantes
+    }
+    shadowRules(dias: $dias) {
+      clave
+      regla
+      mercado
+      nombre
+      descripcion
+      desde
+      picks
+      abiertos
+      liquidados
+      ganados
+      nulos
+      unidades
+      roi
+      roiError
+      roiMediana
+      roiMedianaError
+      nMediana
+      clv
+      clvPositivos
+      nClv
+      lineaVsCierre
+      nLinea
+      cuotaMedia
+      objetivo
+      cumpleUmbral
+    }
+  }
+`;
+
+export const SHADOW_PICKS_QUERY = `
+  query ShadowPicks($dias: Int, $clave: String, $estado: String, $liga: String, $limit: Int) {
+    shadowPicks(dias: $dias, clave: $clave, estado: $estado, liga: $liga, limit: $limit) {
+      id
+      clave
+      reglaNombre
+      mercado
+      liga
+      inicio
+      creado
+      horasAntes
+      local
+      visitante
+      seleccion
+      cuota
+      casa
+      cuotaMediana
+      nCasas
+      cuotaMinima
+      pinnacleJusta
+      edge
+      estado
+      beneficio
+      clv
+      cuotaCierreJusta
+      lineaVsCierre
+      marcador
+      casas {
+        casa
+        cuota
+      }
+    }
+  }
+`;

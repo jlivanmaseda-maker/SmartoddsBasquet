@@ -5,6 +5,8 @@ Queries principales (consumidas por el frontend):
   - stats                        — tracking agregado (profit, ROI, winrate)
   - standings(league)            — clasificacion por ELO de equipo
   - systemConfig                 — config publica (ligas, mercados, intervalos)
+  - shadowRules / shadowPicks / systemStatus — pagina /picks (sombra por regla y mercado, 25-oct-2026;
+                                   ver schemas/sombra.py)
 
 main.py monta este schema en /graphql automaticamente (try/except ImportError).
 """
@@ -18,6 +20,7 @@ from app.db.database import SessionLocal
 from app.models.match import Match
 from app.models.team import Team
 from app.models.bet import Pick
+from app.schemas import sombra
 
 
 # ──────────────────────────────────────────────────────────────
@@ -215,6 +218,23 @@ class Query:
             "active_markets": settings.ACTIVE_MARKETS,
             "system_min_edge": settings.SYSTEM_MIN_EDGE,
         }
+
+
+    # ── Pagina /picks: la sombra por regla y mercado (25-oct-2026) ──
+
+    @strawberry.field
+    def shadow_rules(self, dias: Optional[int] = None) -> List[sombra.ReglaType]:
+        return sombra.reglas(dias)
+
+    @strawberry.field
+    def shadow_picks(self, dias: Optional[int] = None, clave: Optional[str] = None,
+                     estado: Optional[str] = None, liga: Optional[str] = None,
+                     limit: int = 300) -> List[sombra.PickSombraType]:
+        return sombra.picks(dias, clave, estado, liga, min(max(limit, 1), 1000))
+
+    @strawberry.field
+    def system_status(self) -> sombra.EstadoSistemaType:
+        return sombra.estado_sistema()
 
 
 schema = strawberry.Schema(query=Query)
