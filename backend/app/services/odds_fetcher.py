@@ -72,6 +72,18 @@ EXCHANGE_BOOKMAKERS = {"betfair_ex_eu", "betfair_ex_uk", "matchbook", "smarkets"
 LAST_CREDITS = {"remaining": None, "used": None}
 
 
+def describir_401(resp) -> str:
+    """Motivo de un 401 de The Odds API: la misma respuesta vale para cupo agotado y para clave mala."""
+    try:
+        cuerpo = resp.json()
+    except ValueError:
+        cuerpo = None
+    codigo = cuerpo.get("error_code") if isinstance(cuerpo, dict) else None
+    if codigo == "OUT_OF_USAGE_CREDITS":
+        return "Odds API: cupo de creditos agotado, sin cuotas ni resultados hasta que se renueve"
+    return f"ODDS_API_KEY invalida o expirada ({codigo or 'HTTP 401'})"
+
+
 def _league_name(sport_key: str) -> str:
     """Nombre legible de la liga a partir del sport_key."""
     return SPORT_KEY_NAMES.get(sport_key, sport_key)
@@ -219,6 +231,13 @@ def fetch_league_odds(sport_key: str) -> list:
         with httpx.Client(timeout=30.0) as client:
             resp = client.get(url, params=params)
 
+        # Cupo restante, tambien en las respuestas de error: con el cupo agotado debe verse 0
+        remaining = resp.headers.get("x-requests-remaining")
+        used = resp.headers.get("x-requests-used")
+        if remaining:
+            LAST_CREDITS["remaining"], LAST_CREDITS["used"] = remaining, used
+            logger.debug(f"Odds API credits: {remaining} remaining, {used} used")
+
         if resp.status_code == 404:
             # Liga no activa en este momento
             return []
@@ -226,17 +245,10 @@ def fetch_league_odds(sport_key: str) -> list:
             logger.debug(f"{sport_key}: sin eventos activos (422)")
             return []
         if resp.status_code == 401:
-            logger.error("ODDS_API_KEY invalida o expirada")
+            logger.error(describir_401(resp))
             return []
 
         resp.raise_for_status()
-
-        # Log remaining credits
-        remaining = resp.headers.get("x-requests-remaining")
-        used = resp.headers.get("x-requests-used")
-        if remaining:
-            LAST_CREDITS["remaining"], LAST_CREDITS["used"] = remaining, used
-            logger.debug(f"Odds API credits: {remaining} remaining, {used} used")
 
         events = resp.json()
         logger.info(f"{sport_key}: {len(events)} eventos con cuotas")

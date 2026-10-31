@@ -35,8 +35,15 @@ from sqlalchemy import or_, and_
 from app.config import settings
 from app.models.match import Match
 from app.models.bet import Pick, UserBet
+from app.services.odds_fetcher import describir_401
 
 logger = logging.getLogger("smartodds_basketball.scores")
+
+# Ultimo fallo de /scores por liga (31-oct-2026, cupo agotado). Mientras falla la consulta no se sabe nada de los
+# partidos, y /scores solo devuelve los ultimos 3 dias: un partido que empezo antes de un fallo puede haber salido ya
+# de esa ventana, asi que no se anula solo aunque la consulta vuelva a funcionar (se queda pendiente y el vigilante
+# avisa a las 78 h; a mano: void_postponed_match(force=True)). Esta en memoria: un reinicio la borra.
+_ULTIMO_FALLO_SCORES: dict = {}
 
 # BetsAPI sport_id para basket. (Tennis=13, Table Tennis=92, Basketball=18.)
 BETSAPI_BASKETBALL_SPORT_ID = 18
@@ -542,17 +549,31 @@ def fetch_final_score(match: Match) -> Optional[dict]:
 # Fuente principal: The Odds API /scores (mismo event id que /odds)
 # ──────────────────────────────────────────────────────────────
 
-def _fetch_odds_api_scores(sport_key: str, days_from: int = 3) -> dict:
+def _hubo_fallo_desde_inicio(match: Match) -> bool:
+    """True si /scores ha fallado en esta liga despues de empezar el partido."""
+    fallo = _ULTIMO_FALLO_SCORES.get(match.sport_key)
+    if fallo is None or match.commence_time is None:
+        return False
+    ct = match.commence_time
+    if ct.tzinfo is None:
+        ct = ct.replace(tzinfo=timezone.utc)
+    return fallo >= ct
+
+
+def _fetch_odds_api_scores(sport_key: str, days_from: int = 3) -> Optional[dict]:
     """Marcadores finales de The Odds API (/scores).
 
     Endpoint barato (1-2 creditos por llamada, no por partido) que usa la MISMA
     clave que /odds y devuelve el MISMO event id, asi que casa directo con
     match.external_id sin tener que re-emparejar por nombres.
 
-    Returns {event_id: dict_marcador} SOLO para partidos completados.
+    Returns {event_id: dict_marcador} SOLO para partidos completados, o None si la
+    consulta ha fallado (cupo agotado, clave, red): entonces no se sabe nada y el
+    llamador NO debe tratar los partidos como "sin resultado".
     """
     if not settings.ODDS_API_KEY or not sport_key:
-        return {}
+        _ULTIMO_FALLO_SCORES[sport_key] = datetime.now(timezone.utc)
+        return None
     url = f"{settings.ODDS_API_BASE_URL}/sports/{sport_key}/scores"
     params = {"apiKey": settings.ODDS_API_KEY, "daysFrom": days_from}
     out = {}
@@ -560,8 +581,10 @@ def _fetch_odds_api_scores(sport_key: str, days_from: int = 3) -> dict:
         with httpx.Client(timeout=20.0) as client:
             resp = client.get(url, params=params)
         if not resp.is_success:
-            logger.warning(f"/scores {sport_key} -> HTTP {resp.status_code}")
-            return {}
+            motivo = describir_401(resp) if resp.status_code == 401 else f"HTTP {resp.status_code}"
+            logger.warning(f"/scores {sport_key}: {motivo}")
+            _ULTIMO_FALLO_SCORES[sport_key] = datetime.now(timezone.utc)
+            return None
         for ev in resp.json():
             if not ev.get("completed"):
                 continue
@@ -590,7 +613,8 @@ def _fetch_odds_api_scores(sport_key: str, days_from: int = 3) -> dict:
         return out
     except Exception as e:
         logger.warning(f"Odds API /scores error para {sport_key}: {e}")
-        return {}
+        _ULTIMO_FALLO_SCORES[sport_key] = datetime.now(timezone.utc)
+        return None
 
 
 # ──────────────────────────────────────────────────────────────
@@ -634,7 +658,10 @@ def resolve_completed(db: Session) -> int:
             if ext.startswith("betsapi_"):
                 result = fetch_final_score(match)            # BetsAPI fallback
             else:
-                result = (scores_maps.get(match.sport_key) or {}).get(ext)
+                mapa = scores_maps.get(match.sport_key, {})
+                if mapa is None:
+                    continue        # la consulta ha fallado: el partido sigue pendiente
+                result = mapa.get(ext)
         except Exception as e:
             logger.error(
                 f"fetch score fallo para "
@@ -643,6 +670,12 @@ def resolve_completed(db: Session) -> int:
             continue
 
         if result is None:
+            if not ext.startswith("betsapi_") and _hubo_fallo_desde_inicio(match):
+                logger.info(
+                    f"Sin resultado de {match.home_team} vs {match.away_team}, pero /scores ha "
+                    f"fallado desde que empezo: no se anula"
+                )
+                continue
             # Sin resultado: si lleva demasiado tiempo sin completarse, evaluar
             # aplazamiento (con guarda de 72h dentro de void_postponed_match).
             resolved_count += void_postponed_match(db, match)
